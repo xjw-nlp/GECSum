@@ -69,7 +69,7 @@ python main.py --cuda --gpuid [list of gpuid] --config [name of config] -l -p [n
 ## Evaluation
 ### Example on CNNDM
 ```console
-python main.py --cuda --gpuid 0 --config cnndm -e --model_pt summscreen/model_generation.bin
+python main.py --cuda --gpuid 0 --config cnndm -e --model_pt cnndm/model_generation.bin
 ```
 ## Citation
 ```console
