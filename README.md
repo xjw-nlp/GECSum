@@ -73,5 +73,25 @@ python main.py --cuda --gpuid 0 --config cnndm -e --model_pt cnndm/model_generat
 ```
 ## Citation
 ```console
+@inproceedings{xie-etal-2024-gecsum-generative,
+    title = "{GECS}um: Generative Evaluation-Driven Sequence Level Contrastive Learning for Abstractive Summarization",
+    author = "Xie, Jiawen  and
+      Zhang, Shaoting  and
+      Zhang, Xiaofan",
+    editor = "Calzolari, Nicoletta  and
+      Kan, Min-Yen  and
+      Hoste, Veronique  and
+      Lenci, Alessandro  and
+      Sakti, Sakriani  and
+      Xue, Nianwen",
+    booktitle = "Proceedings of the 2024 Joint International Conference on Computational Linguistics, Language Resources and Evaluation (LREC-COLING 2024)",
+    month = may,
+    year = "2024",
+    address = "Torino, Italy",
+    publisher = "ELRA and ICCL",
+    url = "https://aclanthology.org/2024.lrec-main.670",
+    pages = "7581--7595",
+    abstract = "While dominant in abstractive summarization, transformer-based language models with the standard maximum likelihood estimation (MLE) training remain challenged by two discrepancies: the misalignment between token-level training and sequence-level evaluation, and the divergence between teacher-forcing training manner and auto-regressive generation behavior. Recent studies have shown that sequence-level contrastive learning, which utilizes the quality differences between multiple summaries as prior information, can effectively mitigate these issues. However, as certain evaluation metrics often determine the contrastive signals in existing methods, this leads to the model performance aligning with the preferences of these metrics being limited by the evaluation capabilities of these metrics. Inspired by prior works that treat the evaluation of generated text as a text generation problem, we propose a generative evaluation-driven contrastive learning framework, which leverages the semantic understanding capabilities of the abstractive model itself to evaluate summary in reference-based settings. In this way, our method establishes a connection between the model{'}s reference-based evaluation and reference-free generation scenarios, allowing them to share the benefits of model capability enhancements. Extensive experiments on four summarization datasets demonstrate that our method outperforms the previous state-of-the-art regarding comprehensive performance. Various empirical analyses further substantiate the effectiveness of our method.",
+}
 
 ```

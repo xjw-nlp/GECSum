@@ -36,10 +36,10 @@ def RankingLoss(score, summary_score=None, margin=0, gold_margin=0, gold_weight=
 
 
 
-class BRIO(nn.Module):
+class GECSum(nn.Module):
     
     def __init__(self, mname, pad_token_id, is_pegasus=False):
-        super(BRIO, self).__init__()
+        super(GECSum, self).__init__()
         if is_pegasus:
             self.model = PegasusScorer.from_pretrained(mname, cache_dir="./local_cache")
         else:
