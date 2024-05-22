@@ -8,12 +8,12 @@ import random
 from compare_mt.rouge.rouge_scorer import RougeScorer
 from transformers import BartTokenizer, PegasusTokenizer
 from utils import Recorder
-from data_utils import to_cuda, collate_mp_brio, BrioDataset
+from data_utils import to_cuda, collate_mp_gecsum, GECSumDataset
 from torch.utils.data import DataLoader
 import torch.distributed as dist
 import torch.multiprocessing as mp
 from functools import partial
-from model import RankingLoss, BRIO
+from model import RankingLoss, GECSum
 import logging
 from label_smoothing_loss import label_smoothing_loss
 from nltk import sent_tokenize, word_tokenize
@@ -72,14 +72,14 @@ def evaluation(args):
         tok = PegasusTokenizer.from_pretrained(args.model_type)
     else:
         tok = BartTokenizer.from_pretrained(args.model_type)
-    collate_fn = partial(collate_mp_brio, pad_token_id=tok.pad_token_id, is_test=True)
-    test_set = BrioDataset(f"./{args.dataset}/{args.datatype}/test", args.model_type, is_test=True, max_len=512,
+    collate_fn = partial(collate_mp_gecsum, pad_token_id=tok.pad_token_id, is_test=True)
+    test_set = GECSumDataset(f"./{args.dataset}/{args.datatype}/test", args.model_type, is_test=True, max_len=512,
      is_sorted=False, max_num=args.max_num, is_untok=True, total_len=args.total_len, is_pegasus=args.is_pegasus)
     batch_size = 4
     dataloader = DataLoader(test_set, batch_size=batch_size, shuffle=False, num_workers=4, collate_fn=collate_fn)
     # build models
     model_path = args.pretrained if args.pretrained is not None else args.model_type
-    model = BRIO(model_path, tok.pad_token_id, args.is_pegasus)
+    model = GECSum(model_path, tok.pad_token_id, args.is_pegasus)
     if args.cuda:
         model = model.cuda()
 
@@ -356,10 +356,10 @@ def run(rank, args):
         tok = PegasusTokenizer.from_pretrained(args.model_type)
     else:
         tok = BartTokenizer.from_pretrained(args.model_type)
-    collate_fn = partial(collate_mp_brio, pad_token_id=tok.pad_token_id, is_test=False)
-    collate_fn_val = partial(collate_mp_brio, pad_token_id=tok.pad_token_id, is_test=True)
-    train_set = BrioDataset(f"./{args.dataset}/{args.datatype}/train", args.model_type, max_len=args.max_len, max_num=args.max_num, total_len=args.total_len, is_pegasus=args.is_pegasus)
-    val_set = BrioDataset(f"./{args.dataset}/{args.datatype}/val", args.model_type, is_test=True, max_len=512, is_sorted=False, max_num=args.max_num, total_len=args.total_len, is_pegasus=args.is_pegasus)
+    collate_fn = partial(collate_mp_gecsum, pad_token_id=tok.pad_token_id, is_test=False)
+    collate_fn_val = partial(collate_mp_gecsum, pad_token_id=tok.pad_token_id, is_test=True)
+    train_set = GECSumDataset(f"./{args.dataset}/{args.datatype}/train", args.model_type, max_len=args.max_len, max_num=args.max_num, total_len=args.total_len, is_pegasus=args.is_pegasus)
+    val_set = GECSumDataset(f"./{args.dataset}/{args.datatype}/val", args.model_type, is_test=True, max_len=512, is_sorted=False, max_num=args.max_num, total_len=args.total_len, is_pegasus=args.is_pegasus)
     if is_mp:
         train_sampler = torch.utils.data.distributed.DistributedSampler(
     	 train_set, num_replicas=world_size, rank=rank, shuffle=True)
@@ -374,7 +374,7 @@ def run(rank, args):
         val_gen_dataloader = DataLoader(val_set, batch_size=8, shuffle=False, num_workers=4, collate_fn=collate_fn_val)
     # build models
     model_path = args.pretrained if args.pretrained is not None else args.model_type
-    model = BRIO(model_path, tok.pad_token_id, is_pegasus=args.is_pegasus)
+    model = GECSum(model_path, tok.pad_token_id, is_pegasus=args.is_pegasus)
     if len(args.model_pt) > 0:
         model.load_state_dict(torch.load(os.path.join("./cache", args.model_pt), map_location=f'cuda:{gpuid}'))
     if args.cuda:

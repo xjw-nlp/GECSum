@@ -11,7 +11,7 @@ def to_cuda(batch, gpuid):
             batch[n] = batch[n].to(gpuid)
 
 
-class BrioDataset(Dataset):
+class GECSumDataset(Dataset):
     def __init__(self, fdir, model_type, max_len=-1, is_test=False, total_len=512, is_sorted=True, max_num=-1, is_untok=True, is_pegasus=False, num=-1):
         """ data format: article, abstract, [(candidiate_i, score_i)] """
         self.isdir = os.path.isdir(fdir)
@@ -90,7 +90,7 @@ class BrioDataset(Dataset):
         return result
 
 
-def collate_mp_brio(batch, pad_token_id, is_test=False):
+def collate_mp_gecsum(batch, pad_token_id, is_test=False):
     def pad(X, max_len=-1):
         if max_len < 0:
             max_len = max(x.size(0) for x in X)
