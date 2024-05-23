@@ -229,7 +229,7 @@ def test(dataloader, gen_dataloader, model, args, tok, gpuid, do_sample=False):
     _model.scoring_mode()
     with torch.no_grad():
         # scoring
-        for (i, batch) in enumerate(dataloader):
+        for (i, batch) in enumerate(tqdm(dataloader)):
             if args.cuda:
                 to_cuda(batch, device)
             samples = batch["data"]
@@ -260,15 +260,15 @@ def test(dataloader, gen_dataloader, model, args, tok, gpuid, do_sample=False):
 
     if len(args.gpuid) > 1:
         rouge1 = torch.FloatTensor([rouge1]).to(device)
-        dist.all_reduce(rouge1, op=dist.reduce_op.SUM)
+        dist.all_reduce(rouge1, op=dist.ReduceOp.SUM)
         rouge1 = rouge1.item() / len(args.gpuid)
         rouge2 = torch.FloatTensor([rouge2]).to(device)
-        dist.all_reduce(rouge2, op=dist.reduce_op.SUM)
+        dist.all_reduce(rouge2, op=dist.ReduceOp.SUM)
         rouge2 = rouge2.item() / len(args.gpuid)
         rougeLsum = torch.FloatTensor([rougeLsum]).to(device)
-        dist.all_reduce(rougeLsum, op=dist.reduce_op.SUM)
+        dist.all_reduce(rougeLsum, op=dist.ReduceOp.SUM)
         rougeLsum = rougeLsum.item() / len(args.gpuid)
-        dist.all_reduce(mle_loss, op=dist.reduce_op.SUM)
+        dist.all_reduce(mle_loss, op=dist.ReduceOp.SUM)
         mle_loss = mle_loss.item() / len(args.gpuid)
     
     cnt = 0
@@ -279,7 +279,7 @@ def test(dataloader, gen_dataloader, model, args, tok, gpuid, do_sample=False):
         def process(x):
             return sent_tokenize(" ".join(word_tokenize(x.strip())))
         with torch.no_grad():
-            for (i, batch) in enumerate(gen_dataloader):
+            for (i, batch) in enumerate(tqdm(gen_dataloader)):
                 if args.cuda:
                     to_cuda(batch, device)
                 samples = batch["data"]
@@ -312,13 +312,13 @@ def test(dataloader, gen_dataloader, model, args, tok, gpuid, do_sample=False):
         sample_rougeLsum = sample_rougeLsum / cnt
         if len(args.gpuid) > 1:
             sample_rouge1 = torch.FloatTensor([sample_rouge1]).to(device)
-            dist.all_reduce(sample_rouge1, op=dist.reduce_op.SUM)
+            dist.all_reduce(sample_rouge1, op=dist.ReduceOp.SUM)
             sample_rouge1 = sample_rouge1.item() / len(args.gpuid)
             sample_rouge2 = torch.FloatTensor([sample_rouge2]).to(device)
-            dist.all_reduce(sample_rouge2, op=dist.reduce_op.SUM)
+            dist.all_reduce(sample_rouge2, op=dist.ReduceOp.SUM)
             sample_rouge2 = sample_rouge2.item() / len(args.gpuid)
             sample_rougeLsum = torch.FloatTensor([sample_rougeLsum]).to(device)
-            dist.all_reduce(sample_rougeLsum, op=dist.reduce_op.SUM)
+            dist.all_reduce(sample_rougeLsum, op=dist.ReduceOp.SUM)
             sample_rougeLsum = sample_rougeLsum.item() / len(args.gpuid)
     model.train()
     return {
@@ -358,8 +358,8 @@ def run(rank, args):
         tok = BartTokenizer.from_pretrained(args.model_type)
     collate_fn = partial(collate_mp_gecsum, pad_token_id=tok.pad_token_id, is_test=False)
     collate_fn_val = partial(collate_mp_gecsum, pad_token_id=tok.pad_token_id, is_test=True)
-    train_set = GECSumDataset(f"./{args.dataset}/{args.datatype}/train", args.model_type, max_len=args.max_len, max_num=args.max_num, total_len=args.total_len, is_pegasus=args.is_pegasus)
-    val_set = GECSumDataset(f"./{args.dataset}/{args.datatype}/val", args.model_type, is_test=True, max_len=512, is_sorted=False, max_num=args.max_num, total_len=args.total_len, is_pegasus=args.is_pegasus)
+    train_set = GECSumDataset(f"/{args.dataset}/{args.datatype}/train", args.model_type, max_len=args.max_len, max_num=args.max_num, total_len=args.total_len, is_pegasus=args.is_pegasus)
+    val_set = GECSumDataset(f"/{args.dataset}/{args.datatype}/val", args.model_type, is_test=True, max_len=512, is_sorted=False, max_num=args.max_num, total_len=args.total_len, is_pegasus=args.is_pegasus)
     if is_mp:
         train_sampler = torch.utils.data.distributed.DistributedSampler(
     	 train_set, num_replicas=world_size, rank=rank, shuffle=True)
@@ -405,7 +405,7 @@ def run(rank, args):
             id = torch.FloatTensor([id]).to(gpuid)
         else:
             id = torch.zeros(1).to(gpuid)
-        dist.all_reduce(id, op=dist.reduce_op.SUM)
+        dist.all_reduce(id, op=dist.ReduceOp.SUM)
         id = int(id.item())
     # define evaluation function
     if args.dataset == "xsum":
@@ -422,7 +422,7 @@ def run(rank, args):
         step_cnt = 0
         epoch_step = 0
         avg_loss = 0
-        for (i, batch) in enumerate(dataloader):
+        for (i, batch) in enumerate(tqdm(dataloader)):
             if args.cuda:
                 to_cuda(batch, gpuid)
             step_cnt += 1

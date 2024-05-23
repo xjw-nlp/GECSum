@@ -9,7 +9,7 @@ def cnndm_setting(args):
     args.gold_weight = getattr(args, "gold_weight", 0)
     args.mle_weight = getattr(args, "mle_weight", 0.1)
     args.rank_weight = getattr(args, "rank_weight", 10)
-    args.model_type = getattr(args, "model_type", "facebook/bart-large-cnn")
+    args.model_type = getattr(args, "model_type", "/apdcephfs_qy3/share_1565115/jonxie/model_base/bart-large-cnn")
     args.warmup_steps = getattr(args, "warmup_steps", 10000)
     args.normalize = getattr(args, "normalize", True)
     args.grad_norm = getattr(args, "grad_norm", 0)
@@ -20,7 +20,7 @@ def cnndm_setting(args):
     args.scale = getattr(args, "scale", 1)
     args.score_mode = getattr(args, "score_mode", "log")
     args.datatype = getattr(args, "datatype", "diverse")
-    args.dataset = getattr(args, "dataset", "cnndm")
+    args.dataset = getattr(args, "dataset", "/apdcephfs_qy3/share_1565115/jonxie/data_base/GECSum/cnndm")
     args.max_len = getattr(args, "max_len", 120)
     args.max_num = getattr(args, "max_num", 16)
     args.smooth = getattr(args, "smooth", 0.1)
@@ -31,7 +31,7 @@ def cnndm_setting(args):
     args.gen_min_len = getattr(args, "gen_min_len", 55)
     args.is_pegasus = getattr(args, "is_pegasus", False)
     args.adding = getattr(args, "adding", 0)
-    args.eval_interval = getattr(args, "eval_interval", 1000)
+    args.eval_interval = getattr(args, "eval_interval", 10)
     args.num_beams = getattr(args, "num_beams", 4)
 
 def xsum_setting(args):

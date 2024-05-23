@@ -56,11 +56,11 @@ In this paper, we propose a generative evaluation-driven sequence-level contrast
 ## Preprocessing
 We use the following datasets for our experiments. 
 - CNNDM -> [https://cs.nyu.edu/~kcho/DMQA/](https://cs.nyu.edu/~kcho/DMQA/)
-- XSum -> [https://github.com/armancohan/long-summarization](https://github.com/armancohan/long-summarization)
-- SAMSum -> [https://github.com/luyang-huang96/LongDocSum](https://github.com/luyang-huang96/LongDocSum)
-- MeQSum -> [https://github.com/mingdachen/SummScreen](https://github.com/mingdachen/SummScreen)
+- XSum -> [https://github.com/EdinburghNLP/XSum](https://github.com/EdinburghNLP/XSum)
+- SAMSum -> [https://huggingface.co/datasets/Samsung/samsum](https://huggingface.co/datasets/Samsung/samsum)
+- MeQSum -> [https://github.com/abachaa/MeQSum](https://github.com/abachaa/MeQSum)
 
-We can also download the preprocessed datasets: [CNNDM](https://huggingface.co/datasets/ccdv/arxiv-summarization), [XSum](https://huggingface.co/datasets/ccdv/pubmed-summarization), [SAMSum](https://huggingface.co/datasets/ccdv/govreport-summarization), [MeQSum]().
+We can also download the preprocessed datasets: [CNNDM](), [XSum](), [SAMSum](), [MeQSum]().
   
 ## Training
 ```console
