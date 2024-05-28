@@ -18,7 +18,7 @@ from model import RankingLoss, GECSum
 import logging
 from label_smoothing_loss import label_smoothing_loss
 from nltk import sent_tokenize, word_tokenize
-from config import cnndm_setting, xsum_setting
+from config import cnndm_setting, xsum_setting, samsum_setting, meqsum_setting
 from tqdm import tqdm
 from datasets import load_from_disk
 
@@ -220,60 +220,9 @@ def test(dataloader, gen_dataloader, model, args, tok, gpuid, do_sample=False):
         _model = model.module
     else:
         _model = model
+   
     cnt = 0
     rouge_scorer = RougeScorer(['rouge1', 'rouge2', 'rougeLsum'], use_stemmer=True)
-    rouge1, rouge2, rougeLsum = 0, 0, 0
-    mle_loss = 0
-    if args.smooth > 0:
-        mle_fn = label_smoothing_loss(ignore_index=tok.pad_token_id, epsilon=args.smooth)
-    else:
-        mle_fn = nn.CrossEntropyLoss(ignore_index=tok.pad_token_id)
-    _model.scoring_mode()
-    with torch.no_grad():
-        # scoring
-        for (i, batch) in enumerate(tqdm(dataloader)):
-            if args.cuda:
-                to_cuda(batch, device)
-            samples = batch["data"]
-            output = model(batch["src_input_ids"], batch["candidate_ids"], args.normalize, args.score_mode, args.length_penalty, adding=args.adding)
-            similarity, gold_similarity = output['score'], output['summary_score']
-            similarity = similarity * args.scale
-            gold_similarity = gold_similarity * args.scale
-            similarity = similarity.cpu().numpy()
-            probs = output["probs"]  # [bz, seq_len, word_num]
-            probs = output["probs"][:, :-1]  # truncate last token
-            gold = batch["candidate_ids"][:, 0, 1:]  # shift right
-            mle_loss += mle_fn(probs.transpose(1, 2), gold)
-            if i % 1000 == 0:
-                print(f"test similarity: {similarity[0]}")
-            max_ids = similarity.argmax(1)
-            for j in range(similarity.shape[0]):
-                cnt += 1
-                sample = samples[j]
-                sents = sample["candidates"][max_ids[j]][0]
-                score = rouge_scorer.score("\n".join(sample["abstract"]), "\n".join(sents))
-                rouge1 += score["rouge1"].fmeasure
-                rouge2 += score["rouge2"].fmeasure
-                rougeLsum += score["rougeLsum"].fmeasure
-    rouge1 = rouge1 / cnt
-    rouge2 = rouge2 / cnt
-    rougeLsum = rougeLsum / cnt
-    mle_loss = mle_loss / cnt
-
-    if len(args.gpuid) > 1:
-        rouge1 = torch.FloatTensor([rouge1]).to(device)
-        dist.all_reduce(rouge1, op=dist.ReduceOp.SUM)
-        rouge1 = rouge1.item() / len(args.gpuid)
-        rouge2 = torch.FloatTensor([rouge2]).to(device)
-        dist.all_reduce(rouge2, op=dist.ReduceOp.SUM)
-        rouge2 = rouge2.item() / len(args.gpuid)
-        rougeLsum = torch.FloatTensor([rougeLsum]).to(device)
-        dist.all_reduce(rougeLsum, op=dist.ReduceOp.SUM)
-        rougeLsum = rougeLsum.item() / len(args.gpuid)
-        dist.all_reduce(mle_loss, op=dist.ReduceOp.SUM)
-        mle_loss = mle_loss.item() / len(args.gpuid)
-    
-    cnt = 0
     sample_rouge1, sample_rouge2, sample_rougeLsum = 0, 0, 0
     if do_sample:
         # generation
@@ -284,8 +233,7 @@ def test(dataloader, gen_dataloader, model, args, tok, gpuid, do_sample=False):
             for (i, batch) in enumerate(tqdm(gen_dataloader)):
                 if args.cuda:
                     to_cuda(batch, device)
-                samples = batch["data"]
-                slines = [" ".join(x["article_untok"]) for x in samples]
+                slines = batch['src_text']
                 dct = tok.batch_encode_plus(slines, max_length=args.total_len, return_tensors="pt", pad_to_max_length=True, truncation=True)
                 summaries = _model.generate(
                     input_ids=dct["input_ids"].to(device),
@@ -298,9 +246,8 @@ def test(dataloader, gen_dataloader, model, args, tok, gpuid, do_sample=False):
                     early_stopping=True,
                 )
                 dec = [tok.decode(g, skip_special_tokens=True, clean_up_tokenization_spaces=False) for g in summaries]
-                for (hypothesis, x) in zip(dec, samples):
+                for (hypothesis, ref) in zip(dec, batch['ref_text']):
                     hypothesis = hypothesis.replace("\n", " ")
-                    ref = " ".join(x["abstract_untok"])
                     x = process(ref)
                     y = process(hypothesis)
                     score = rouge_scorer.score("\n".join(x), "\n".join(y))
@@ -324,13 +271,9 @@ def test(dataloader, gen_dataloader, model, args, tok, gpuid, do_sample=False):
             sample_rougeLsum = sample_rougeLsum.item() / len(args.gpuid)
     model.train()
     return {
-        "rouge1": rouge1,
-        "rouge2": rouge2,
-        "rougeLsum": rougeLsum,
         "sample_rouge1": sample_rouge1,
         "sample_rouge2": sample_rouge2,
         "sample_rougeLsum": sample_rougeLsum,
-        "mle_loss": mle_loss
         } 
 
 
@@ -339,6 +282,10 @@ def run(rank, args):
         cnndm_setting(args)
     elif args.config == "xsum":
         xsum_setting(args)
+    elif args.config == 'samsum':
+        samsum_setting(args)
+    elif args.config == 'meqsum':
+        meqsum_setting(args)
     else:
         base_setting(args)
     # task initialization
@@ -413,9 +360,7 @@ def run(rank, args):
         def eval_fn(rouge1, rouge2, rougeLsum):
             return 1 - (rouge1 * rouge2 + rougeLsum) / 3
     # start training
-    train_set = GECSumDataset(arrow_obj_path="/apdcephfs_qy3/share_1565115/jonxie/data_base/GECSum/cnndm/cnndm_epoch_0_gpu_0", obj_args=args)
-    dataloader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True, num_workers=4, collate_fn=collate_fn)
-    time.sleep(5)
+    dataloader = None
     for epoch in range(args.epoch):
         s_optimizer.zero_grad()
         avg_ranking_loss = 0
@@ -423,10 +368,11 @@ def run(rank, args):
         step_cnt = 0
         epoch_step = 0
         avg_loss = 0
-        # arrow_path = build_candidate(args, model, tok, raw_data, epoch, rank)
-        # train_set = GECSumDataset(args, arrow_obj_path=arrow_path)
-        # dataloader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True, num_workers=4, collate_fn=collate_fn)
-        for (i, batch) in enumerate(tqdm(val_dataloader)):
+        if epoch % args.update_interval == 0:
+            arrow_obj = build_candidate(args, model, tok, raw_data, epoch, rank)
+            train_set = GECSumDataset(arrow_obj=arrow_obj, obj_args=args)
+            dataloader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True, num_workers=4, collate_fn=collate_fn)
+        for (i, batch) in enumerate(tqdm(dataloader)):
             if args.cuda:
                 to_cuda(batch, gpuid)
             step_cnt += 1
@@ -476,20 +422,7 @@ def run(rank, args):
             del similarity, gold_similarity, loss, mle_loss, ranking_loss, output, probs
 
             if all_step_cnt % args.eval_interval == 0 and all_step_cnt != 0 and step_cnt == 0:
-                # evaluate the model as a scorer
                 result = test(val_dataloader, val_gen_dataloader, model, args, tok, gpuid, args.do_sample)
-                loss = eval_fn(result["rouge1"], result["rouge2"], result["rougeLsum"])
-                if loss < minimum_ranking_loss and is_master:
-                    minimum_ranking_loss = loss
-                    if is_mp:
-                        recorder.save(model.module, "model_ranking.bin")
-                    else:
-                        recorder.save(model, "model_ranking.bin")
-                    recorder.print("best ranking loss - epoch: %d, batch: %d"%(epoch, i / args.accumulate_step))
-                if is_master:
-                    recorder.print("val ranking loss: %.6f"%(loss))
-                    recorder.print("val ranking rouge1: %.6f, rouge2: %.6f, rougeLsum: %.6f"
-                    %(result["rouge1"], result["rouge2"], result["rougeLsum"]))
                 # evaluate the model as a generator
                 if args.do_sample:
                     mle_loss = eval_fn(result["sample_rouge1"], result["sample_rouge2"], result["sample_rougeLsum"])

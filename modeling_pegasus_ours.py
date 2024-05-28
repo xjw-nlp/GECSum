@@ -748,7 +748,6 @@ class PegasusEncoder(PegasusPreTrainedModel):
                 layer_outputs = (None, None)
             else:
                 if getattr(self.config, "gradient_checkpointing", False) and self.training:
-
                     def create_custom_forward(module):
                         def custom_forward(*inputs):
                             return module(*inputs, output_attentions)
@@ -1644,10 +1643,11 @@ class CustomPegasusModel(PegasusPreTrainedModel):
             )
 
         if self.is_scoring_mode:
-            cand_num = decoder_input_ids.size(1)
+            bsz, cand_num, dec_seq_len = decoder_input_ids.size()
             encoder_hidden_states = encoder_outputs[0]
-            encoder_hidden_states = torch.repeat_interleave(encoder_hidden_states, cand_num, dim=0)
-            attention_mask = torch.repeat_interleave(attention_mask, cand_num, dim=0)
+            if bsz * cand_num > encoder_hidden_states.size(0):
+                encoder_hidden_states = torch.repeat_interleave(encoder_hidden_states, cand_num, dim=0)
+                attention_mask = torch.repeat_interleave(attention_mask, cand_num, dim=0)
             decoder_input_ids = decoder_input_ids.view(-1, decoder_input_ids.size(-1))
             if decoder_attention_mask is not None:
                 decoder_attention_mask = decoder_attention_mask.view(-1, decoder_attention_mask.size(-1))
