@@ -5,10 +5,11 @@ import argparse
 import numpy as np
 import os
 import random
+import time
 from compare_mt.rouge.rouge_scorer import RougeScorer
 from transformers import BartTokenizer, PegasusTokenizer
 from utils import Recorder
-from data_utils import to_cuda, collate_mp_gecsum, GECSumDataset
+from data_utils import to_cuda, collate_mp_train_gecsum, collate_mp_test_gecsum, build_candidate, GECSumDataset
 from torch.utils.data import DataLoader
 import torch.distributed as dist
 import torch.multiprocessing as mp
@@ -19,6 +20,7 @@ from label_smoothing_loss import label_smoothing_loss
 from nltk import sent_tokenize, word_tokenize
 from config import cnndm_setting, xsum_setting
 from tqdm import tqdm
+from datasets import load_from_disk
 
 logging.getLogger("transformers.tokenization_utils").setLevel(logging.ERROR)
 logging.getLogger("transformers.tokenization_utils_base").setLevel(logging.ERROR)
@@ -356,20 +358,15 @@ def run(rank, args):
         tok = PegasusTokenizer.from_pretrained(args.model_type)
     else:
         tok = BartTokenizer.from_pretrained(args.model_type)
-    collate_fn = partial(collate_mp_gecsum, pad_token_id=tok.pad_token_id, is_test=False)
-    collate_fn_val = partial(collate_mp_gecsum, pad_token_id=tok.pad_token_id, is_test=True)
-    train_set = GECSumDataset(f"/{args.dataset}/{args.datatype}/train", args.model_type, max_len=args.max_len, max_num=args.max_num, total_len=args.total_len, is_pegasus=args.is_pegasus)
-    val_set = GECSumDataset(f"/{args.dataset}/{args.datatype}/val", args.model_type, is_test=True, max_len=512, is_sorted=False, max_num=args.max_num, total_len=args.total_len, is_pegasus=args.is_pegasus)
+    collate_fn = partial(collate_mp_train_gecsum, pad_token_id=tok.pad_token_id)
+    collate_fn_val = partial(collate_mp_test_gecsum, pad_token_id=tok.pad_token_id)
+    val_set = GECSumDataset(data_type='validation', obj_args=args)
     if is_mp:
-        train_sampler = torch.utils.data.distributed.DistributedSampler(
-    	 train_set, num_replicas=world_size, rank=rank, shuffle=True)
-        dataloader = DataLoader(train_set, batch_size=args.batch_size, shuffle=False, num_workers=4, collate_fn=collate_fn, sampler=train_sampler)
         val_sampler = torch.utils.data.distributed.DistributedSampler(
     	 val_set, num_replicas=world_size, rank=rank)
         val_dataloader = DataLoader(val_set, batch_size=1, shuffle=False, num_workers=4, collate_fn=collate_fn_val, sampler=val_sampler)
         val_gen_dataloader = DataLoader(val_set, batch_size=8, shuffle=False, num_workers=4, collate_fn=collate_fn_val, sampler=val_sampler)
     else:
-        dataloader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True, num_workers=4, collate_fn=collate_fn)
         val_dataloader = DataLoader(val_set, batch_size=1, shuffle=False, num_workers=4, collate_fn=collate_fn_val)
         val_gen_dataloader = DataLoader(val_set, batch_size=8, shuffle=False, num_workers=4, collate_fn=collate_fn_val)
     # build models
@@ -397,6 +394,7 @@ def run(rank, args):
     s_optimizer = optim.Adam(model.parameters())
     if is_master:
         recorder.write_config(args, [model], __file__)
+    raw_data = load_from_disk(args.src_data_path)
     minimum_ranking_loss = 100
     minimum_mle_loss = 1e5
     all_step_cnt = 0
@@ -415,6 +413,9 @@ def run(rank, args):
         def eval_fn(rouge1, rouge2, rougeLsum):
             return 1 - (rouge1 * rouge2 + rougeLsum) / 3
     # start training
+    train_set = GECSumDataset(arrow_obj_path="/apdcephfs_qy3/share_1565115/jonxie/data_base/GECSum/cnndm/cnndm_epoch_0_gpu_0", obj_args=args)
+    dataloader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True, num_workers=4, collate_fn=collate_fn)
+    time.sleep(5)
     for epoch in range(args.epoch):
         s_optimizer.zero_grad()
         avg_ranking_loss = 0
@@ -422,7 +423,10 @@ def run(rank, args):
         step_cnt = 0
         epoch_step = 0
         avg_loss = 0
-        for (i, batch) in enumerate(tqdm(dataloader)):
+        # arrow_path = build_candidate(args, model, tok, raw_data, epoch, rank)
+        # train_set = GECSumDataset(args, arrow_obj_path=arrow_path)
+        # dataloader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True, num_workers=4, collate_fn=collate_fn)
+        for (i, batch) in enumerate(tqdm(val_dataloader)):
             if args.cuda:
                 to_cuda(batch, gpuid)
             step_cnt += 1
