@@ -2,7 +2,7 @@ def cnndm_setting(args):
     # default setting for cnndm
     args.batch_size = getattr(args, 'batch_size', 1)
     args.epoch = getattr(args, 'epoch', 100)
-    args.report_freq = getattr(args, "report_freq", 100)
+    args.report_freq = getattr(args, "report_freq", 10)
     args.accumulate_step = getattr(args, "accumulate_step", 8)
     args.margin = getattr(args, "margin", 0.001)
     args.gold_margin = getattr(args, "gold_margin", 0)
@@ -33,7 +33,7 @@ def cnndm_setting(args):
     args.gen_min_len = getattr(args, "gen_min_len", 55)
     args.is_pegasus = getattr(args, "is_pegasus", False)
     args.adding = getattr(args, "adding", 0)
-    args.eval_interval = getattr(args, "eval_interval", 1000)
+    args.eval_interval = getattr(args, "eval_interval", 200)
     args.num_beams = getattr(args, "num_beams", 4)
 
 def xsum_setting(args):
