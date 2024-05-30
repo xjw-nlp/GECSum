@@ -293,7 +293,7 @@ def run(rank, args):
     torch.cuda.manual_seed_all(args.seed)
     np.random.seed(args.seed)
     random.seed(args.seed)
-    gpuid = args.gpuid[rank]
+    gpuid = rank
     is_master = rank == 0
     is_mp = len(args.gpuid) > 1
     world_size = len(args.gpuid)
@@ -447,6 +447,7 @@ def run(rank, args):
                     else:
                         recorder.save(model, "model_cur.bin")
                     recorder.save(s_optimizer, "optimizer.bin")
+        torch.cuda.synchronize()
 
 
 def main(args):
@@ -454,6 +455,8 @@ def main(args):
     if len(args.gpuid) > 1:
         os.environ['MASTER_ADDR'] = 'localhost'
         os.environ['MASTER_PORT'] = f'{args.port}'
+        print(args.gpuid)
+        os.environ["CUDA_VISIBLE_DEVICES"] = ','.join(map(str, args.gpuid))
         mp.spawn(run, args=(args,), nprocs=len(args.gpuid), join=True)
     else:
         run(0, args)
