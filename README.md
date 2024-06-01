@@ -3,7 +3,7 @@
 [![Data License](https://img.shields.io/badge/Data%20License-CC%20By%20NC%204.0-red.svg)](https://github.com/xjw-nlp/SimCAS/blob/main/DATA_LICENSE)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/release/python-380/)
 
-The repository contains the code, data, and models for the paper [GECSum: Generative Evaluation-Driven Sequence Level Contrastive Learning for Abstractive Summarization]().
+The repository contains the code, data, and models for the paper [GECSum: Generative Evaluation-Driven Sequence Level Contrastive Learning for Abstractive Summarization](https://aclanthology.org/2024.lrec-main.670/), COLING 2024.
 ## Quick Links
 - [Recap](#recap)
 - [Installation](#installation)
